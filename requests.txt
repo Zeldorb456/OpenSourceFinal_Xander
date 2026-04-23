@@ -1,0 +1,28 @@
+{{host}}/shopping/cart
+{
+    "items": [
+        {
+            "itemName": "Bread",
+            "itemQuantity": 2,
+            "itemPrice": 1.39
+        },
+                {
+            "itemName": "Bananas",
+            "itemQuantity": 1,
+            "itemPrice": 0.98
+        },
+                {
+            "itemName": "Eggs",
+            "itemQuantity": 12,
+            "itemPrice": 0.62
+        }
+    ]
+}
+
+
+{{host}}/user/login
+{
+    "userName": "test",
+    "userPassword": "testPassword123"
+}
+
