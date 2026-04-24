@@ -6,25 +6,25 @@ import userRoutes from "./ports/rest/routes/user";
 import dependencies from "./infrastructure/dependencies";
 
 const app = express();
-app.use(express.urlencoded({extended: false}));
-app.use(cors())
+const PORT = process.env.PORT || 3000;
+
+app.use(express.urlencoded({ extended: false }));
+app.use(cors());
 app.use(express.json());
 
-dotenv.config(); //allows environment variables to be accessed.
+dotenv.config();
 
-const {mongoDbClient} = dependencies;
-mongoDbClient.ConnectToDb();
+const { mongoDbClient } = dependencies;
+mongoDbClient.ConnectToDb()
+  .catch(err => console.error('DB connection failed:', err));
 
-// Health check
-app.use("/healthcheck", (req, res, next) => {
-  res.status(200).json({ message: "Successful" });
+app.use("/healthcheck", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 app.use("/user", userRoutes);
 app.use("/booking", bookingRoutes);
 
-const port = 3000;
-
-app.listen(port, () => {
-  console.log(`Now listening on port ${port}`);
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });

@@ -5,19 +5,22 @@ export class MongoBookingRepository implements IBookingRepository {
   constructor(private mongoDbBooking: any) {}
 
   async create(bookingData: any): Promise<any> {
-    return await bookingQueries.createBooking(this.mongoDbBooking, bookingData);
+    const booking = await bookingQueries.createBooking(this.mongoDbBooking, bookingData);
+    console.log('New booking created:', booking._id);
+    return booking;
   }
 
   async findAll(): Promise<any[]> {
-    return await bookingQueries.getBookings(this.mongoDbBooking);
+    return bookingQueries.getBookings(this.mongoDbBooking);
   }
 
   async findById(id: string): Promise<any> {
-    return await bookingQueries.getBookingById(this.mongoDbBooking, id);
+    const booking = await bookingQueries.getBookingById(this.mongoDbBooking, id);
+    return booking;
   }
 
   async updateStatus(id: string, status: string): Promise<any> {
-    return await bookingQueries.updateBookingStatus(this.mongoDbBooking, id, status);
+    return bookingQueries.updateBookingStatus(this.mongoDbBooking, id, status);
   }
 
   async findByUser(userId: string): Promise<any[]> {

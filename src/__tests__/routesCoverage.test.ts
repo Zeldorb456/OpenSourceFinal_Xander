@@ -17,7 +17,6 @@ describe('Routes Coverage', () => {
   const mockNext = jest.fn() as NextFunction;
 
   it('should handle service creation', () => {
-    // Test route handler logic
     expect(mockRes.status).toBeDefined();
     mockRes.status(201);
     expect(mockRes.status).toHaveBeenCalledWith(201);

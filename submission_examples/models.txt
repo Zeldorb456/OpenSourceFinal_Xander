@@ -1,0 +1,57 @@
+﻿# Aggregated file: models.txt
+\n===== src\infrastructure\mongodb\models\booking.ts =====
+import mongoose from 'mongoose';
+
+const Schema = mongoose.Schema;
+
+const BookingModelSchema = new Schema({
+  serviceId: {type: mongoose.Schema.Types.ObjectId, ref: 'ServiceModel', required: true},
+  userId: {type: mongoose.Schema.Types.ObjectId, ref: 'UserModel'},
+  guestName: {type: String},
+  guestEmail: {type: String},
+  date: {type: Date, required: true},
+  status: {type: String, required: true, enum: ['pending', 'confirmed', 'declined', 'cancelled'], default: 'pending'},
+  notes: {type: String},
+  createdAt: {type: Date, default: Date.now},
+  updatedAt: {type: Date, default: Date.now}
+});
+
+export const Booking = mongoose.model("BookingModel", BookingModelSchema);
+\n===== src\infrastructure\mongodb\models\index.ts =====
+export * from './service';
+export * from './booking';
+export * from './user';
+\n===== src\infrastructure\mongodb\models\service.ts =====
+import mongoose from 'mongoose';
+
+const Schema = mongoose.Schema;
+
+const ServiceModelSchema = new Schema({
+  name: {type: String, required: true},
+  type: {type: String, required: true, enum: ['hotel', 'transportation', 'car_rental', 'appointment', 'reservation', 'service']},
+  description: {type: String},
+  price: {type: Number, required: true},
+  availability: [{
+    date: {type: Date, required: true},
+    availableSlots: {type: Number, required: true, default: 1},
+    bookedSlots: {type: Number, default: 0}
+  }],
+  createdAt: {type: Date, default: Date.now}
+});
+
+export const Service = mongoose.model("ServiceModel", ServiceModelSchema);
+
+\n===== src\infrastructure\mongodb\models\user.ts =====
+import mongoose from 'mongoose';
+
+const Schema = mongoose.Schema;
+
+const UserModelSchema = new Schema({
+  userName: {type: String, required: true, unique: true},
+  userPassword: {type: String, required: true},
+  email: {type: String, required: true, unique: true},
+  role: {type: String, required: true, enum: ['user', 'admin'], default: 'user'},
+  createdAt: {type: Date, default: Date.now}
+});
+
+export const User = mongoose.model("UserModel", UserModelSchema);

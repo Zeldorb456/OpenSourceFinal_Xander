@@ -1,0 +1,48 @@
+﻿# Aggregated file: config.txt
+\n===== src/config/config.ts =====
+import dotenv from "dotenv-safe";
+
+dotenv.config({ allowEmptyValues: true, path: `.env.${process.env.NODE_ENV}` });
+
+const ENVIRONMENT = process.env.NODE_ENV ?? "development";
+const MONGO_HOST = process.env.MONGO_HOST ?? "";
+const MONGO_DATABASE = process.env.MONGO_DATABASE ?? "";
+const MONGO_PORT = process.env.MONGO_PASSWORD ?? "";
+const MONGO_URL = `mongodb://${MONGO_HOST}:${MONGO_PORT}/${MONGO_DATABASE}`;
+
+export const config = {
+  environment: ENVIRONMENT,
+  mongo: {
+    url: MONGO_URL
+  }
+}
+\n===== src/index.ts =====
+import express from "express";
+import dotenv from "dotenv-safe";
+import cors from 'cors';
+import bookingRoutes from "./ports/rest/routes/booking";
+import userRoutes from "./ports/rest/routes/user";
+import dependencies from "./infrastructure/dependencies";
+
+const app = express();
+app.use(express.urlencoded({extended: false}));
+app.use(cors())
+app.use(express.json());
+
+dotenv.config();
+
+const {mongoDbClient} = dependencies;
+mongoDbClient.ConnectToDb();
+
+app.use("/healthcheck", (req, res, next) => {
+  res.status(200).json({ message: "Successful" });
+});
+
+app.use("/user", userRoutes);
+app.use("/booking", bookingRoutes);
+
+const port = 3000;
+
+app.listen(port, () => {
+  console.log(`Now listening on port ${port}`);
+});

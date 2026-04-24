@@ -8,36 +8,32 @@ export class CreateBookingUseCase {
 
   async execute(bookingData: any): Promise<any> {
     const bookingDate = new Date(bookingData.date);
+    
     if (isNaN(bookingDate.getTime())) {
       throw new Error('Invalid booking date');
     }
 
-    // Check availability
-    const service = await this.serviceRepository.findById(bookingData.serviceId);
-    if (!service || !service.availability) {
-      throw new Error('Service not found');
-    }
+    const svc = await this.serviceRepository.findById(bookingData.serviceId);
+    if (!svc) throw new Error('Service not found');
+    if (!svc.availability) throw new Error('Service has no availability');
 
-    const availability = service.availability.find((avail: any) => {
-      const availDate = new Date(avail.date);
-      return availDate.toDateString() === bookingDate.toDateString();
+    const availSlot = svc.availability.find((slot: any) => {
+      return new Date(slot.date).toDateString() === bookingDate.toDateString();
     });
 
-    if (!availability || availability.availableSlots <= availability.bookedSlots) {
-      throw new Error('Service not available for the selected date');
+    if (!availSlot) throw new Error('No availability on selected date');
+    if (availSlot.availableSlots <= availSlot.bookedSlots) {
+      throw new Error('Service fully booked for this date');
     }
 
-    const bookingPayload = {
+    const payload = {
       ...bookingData,
       date: bookingDate,
     };
 
-    const createdBooking = await this.bookingRepository.create(bookingPayload);
-
-    // Update service availability
+    const booking = await this.bookingRepository.create(payload);
     await this.serviceRepository.updateAvailability(bookingData.serviceId, bookingDate, 1);
-
-    return createdBooking;
+    return booking;
   }
 }
 

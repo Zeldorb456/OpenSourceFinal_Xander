@@ -1,6 +1,10 @@
-import {config} from "../config/config"
+import { config } from "../config/config"
 import mongoDbClient from './mongodb/mongoDbClient';
 
-const dependencies = { config,  mongoDbClient};
+const serviceContainer = {
+  config,
+  mongoDbClient,
+};
 
-export default dependencies;
+export default serviceContainer;
+

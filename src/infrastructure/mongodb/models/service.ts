@@ -1,7 +1,5 @@
-// Require Mongoose
 import mongoose from 'mongoose';
 
-// Define a schema
 const Schema = mongoose.Schema;
 
 const ServiceModelSchema = new Schema({
@@ -17,6 +15,5 @@ const ServiceModelSchema = new Schema({
   createdAt: {type: Date, default: Date.now}
 });
 
-// Compile model from schema
 export const Service = mongoose.model("ServiceModel", ServiceModelSchema);
 

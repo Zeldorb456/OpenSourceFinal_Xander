@@ -1,0 +1,256 @@
+﻿# Aggregated file: routes.txt
+\n===== src\ports\rest\routes\booking.ts =====
+import express, { NextFunction, Response, Request } from "express";
+import dependencies from '../../../infrastructure/dependencies';
+import { createService, getServices, createBooking, getBookings, updateBookingStatus } from '../../../infrastructure/booking';
+import { authenticateToken, authenticateAdmin } from '../middleware/authentication';
+import bookingController from '../../../controllers/booking';
+
+const router = express.Router();
+
+router.get("/services", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const services = await getServices(dependencies)();
+    res.status(200).json(services);
+  } catch (error) {
+    console.log(`Error retrieving services: ${(error as Error).message}`);
+    res.status(500).json({
+      message: `Error retrieving services: ${(error as Error).message}`
+    });
+  }
+});
+
+router.post("/services", authenticateAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const serviceData = req.body;
+    const result = await createService(dependencies)(serviceData);
+    res.status(201).json(result);
+  } catch (error) {
+    console.log(`Error creating service: ${(error as Error).message}`);
+    res.status(500).json({
+      message: `Error creating service: ${(error as Error).message}`
+    });
+  }
+});
+
+router.post("/book", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const bookingData = req.body;
+    bookingController.validateBookingData(bookingData);
+    const result = await createBooking(dependencies)(bookingData);
+    res.status(201).json(result);
+  } catch (error) {
+    console.log(`Error creating booking: ${(error as Error).message}`);
+    res.status(500).json({
+      message: `Error creating booking: ${(error as Error).message}`
+    });
+  }
+});
+
+router.get("/bookings", authenticateAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const bookings = await getBookings(dependencies)();
+    res.status(200).json(bookings);
+  } catch (error) {
+    console.log(`Error retrieving bookings: ${(error as Error).message}`);
+    res.status(500).json({
+      message: `Error retrieving bookings: ${(error as Error).message}`
+    });
+  }
+});
+
+router.put("/bookings/:id/status", authenticateAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const result = await updateBookingStatus(dependencies)(id, status);
+    res.status(200).json(result);
+  } catch (error) {
+    console.log(`Error updating booking status: ${(error as Error).message}`);
+    res.status(500).json({
+      message: `Error updating booking status: ${(error as Error).message}`
+    });
+  }
+});
+
+export = router;
+\n===== src\ports\rest\routes\bookingHandlers.ts =====
+import { NextFunction, Response, Request } from "express";
+import dependencies from '../../../infrastructure/dependencies';
+import { createService as createServiceInfra, getServices as getServicesInfra, createBooking as createBookingInfra, getBookings as getBookingsInfra, updateBookingStatus as updateBookingStatusInfra } from '../../../infrastructure/booking';
+import bookingController from '../../../controllers/booking';
+
+export const handleGetServices = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const services = await getServicesInfra(dependencies)();
+    res.status(200).json(services);
+  } catch (error) {
+    console.log(`Error retrieving services: ${(error as Error).message}`);
+    res.status(500).json({
+      message: `Error retrieving services: ${(error as Error).message}`
+    });
+  }
+};
+
+export const handleCreateService = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const serviceData = req.body;
+    const result = await createServiceInfra(dependencies)(serviceData);
+    res.status(201).json(result);
+  } catch (error) {
+    console.log(`Error creating service: ${(error as Error).message}`);
+    res.status(500).json({
+      message: `Error creating service: ${(error as Error).message}`
+    });
+  }
+};
+
+export const handleCreateBooking = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const bookingData = req.body;
+    bookingController.validateBookingData(bookingData);
+    const result = await createBookingInfra(dependencies)(bookingData);
+    res.status(201).json(result);
+  } catch (error) {
+    console.log(`Error creating booking: ${(error as Error).message}`);
+    res.status(500).json({
+      message: `Error creating booking: ${(error as Error).message}`
+    });
+  }
+};
+
+export const handleGetBookings = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const bookings = await getBookingsInfra(dependencies)();
+    res.status(200).json(bookings);
+  } catch (error) {
+    console.log(`Error retrieving bookings: ${(error as Error).message}`);
+    res.status(500).json({
+      message: `Error retrieving bookings: ${(error as Error).message}`
+    });
+  }
+};
+
+export const handleUpdateBookingStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const result = await updateBookingStatusInfra(dependencies)(id, status);
+    res.status(200).json(result);
+  } catch (error) {
+    console.log(`Error updating booking status: ${(error as Error).message}`);
+    res.status(500).json({
+      message: `Error updating booking status: ${(error as Error).message}`
+    });
+  }
+};
+\n===== src\ports\rest\routes\user.ts =====
+import express, { NextFunction, Response, Request } from "express";
+import bcrypt from "bcrypt";
+import jwt from 'jsonwebtoken';
+import { authenticateToken, generateAccessToken, generateRefreshToken } from '../middleware/authentication';
+import dependencies from '../../../infrastructure/dependencies';
+import { createUser, getUserByUsername } from '../../../infrastructure/user';
+
+const router = express.Router();
+
+let refreshTokenDb: any = [];
+
+router.post("/create", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { userName, userPassword, email, role } = req.body;
+
+        const salt = await bcrypt.genSalt();
+        const hashedPassword = await bcrypt.hash(userPassword, salt);
+
+        const createUserData = {
+            userName,
+            userPassword: hashedPassword,
+            email,
+            role: role || 'user'
+        };
+
+        const createdUser = await createUser(dependencies)(createUserData);
+        res.status(200).json({ userName: createdUser.userName, email: createdUser.email, role: createdUser.role });
+
+    } catch (error) {
+        console.log(`Error creating user: ${(error as Error).message}`);
+        res.status(500).json({
+          message: `Error creating user: ${(error as Error).message}`
+        });
+      }
+})
+
+router.post("/loginJwt", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const user = await getUserByUsername(dependencies)(req.body.userName);
+
+        if(!user){
+            throw new Error("Error logging in, unable to find username!!");
+        }
+
+        const compareResult = await bcrypt.compare(req.body.userPassword, user.userPassword);
+
+        if(!compareResult){
+            throw new Error("Error logging in, invalid password!");
+        }
+
+        const accessToken = generateAccessToken(user);
+        const refreshToken = generateRefreshToken(user);
+        refreshTokenDb.push(refreshToken);
+        res.json({
+            accessToken,
+            refreshToken
+        })
+
+    } catch (error) {
+        console.log(`Error logging in: ${(error as Error).message}`);
+        res.status(500).json({
+            message: `Error logging in: ${(error as Error).message}`
+        });
+    }
+})
+
+router.post("/checkUserAuthenticated", authenticateToken, async (req: any, res: any, next: any) => {
+    try {
+        const user = req.user;
+        console.log(user);
+        res.json({
+            message: "user has access",
+            user,
+        })
+
+    } catch (error) {
+        console.log(`Error checking authentication: ${(error as Error).message}`);
+        res.status(500).json({
+            message: `Error checking authentication: ${(error as Error).message}`
+        });
+    }
+})
+
+router.post("/token", async (req: any, res: any, next: any) => {
+    const refreshToken = req.body.token;
+    if(refreshToken == null) {
+        return res.sendStatus(401);
+    }
+    if(!refreshTokenDb.includes(refreshToken)) {
+        return res.sendStatus(403);
+    }
+
+    jwt.verify(refreshToken, "12345abc", (err: any, user: any) => {
+        if(err) {
+            return res.sendStatus(403);
+        }
+        const accessToken = generateAccessToken(user);
+        res.json({accessToken: accessToken})
+    })
+})
+
+router.delete("/logout", authenticateToken, async (req: any, res: any, next: any) => {
+    refreshTokenDb = refreshTokenDb.filter((token: any) => token !== req.body.token);
+    res.sendStatus(204);
+})
+
+export = router;
+
+

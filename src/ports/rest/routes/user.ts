@@ -9,55 +9,53 @@ const router = express.Router();
 
 let refreshTokenDb: any = [];
 
-router.post("/create", async (req: Request, res: Response, next: NextFunction) => {
+router.post("/create", async (req: Request, res: Response) => {
     try {
         const { userName, userPassword, email, role } = req.body;
+        const salt = await bcrypt.genSalt(10);
+        const hashed = await bcrypt.hash(userPassword, salt);
 
-        const salt = await bcrypt.genSalt();
-        const hashedPassword = await bcrypt.hash(userPassword, salt);
-
-        const createUserData = {
+        const userData = {
             userName,
-            userPassword: hashedPassword,
+            userPassword: hashed,
             email,
             role: role || 'user'
         };
 
-        const createdUser = await createUser(dependencies)(createUserData);
-        res.status(200).json({ userName: createdUser.userName, email: createdUser.email, role: createdUser.role });
-
-    } catch (error) {
-        console.log(`Error creating user: ${(error as Error).message}`);
-        res.status(500).json({
-          message: `Error creating user: ${(error as Error).message}`
+        const newUser = await createUser(dependencies)(userData);
+        res.json({ 
+            userName: newUser.userName, 
+            email: newUser.email, 
+            role: newUser.role 
         });
-      }
+    } catch (error) {
+        console.error(`User creation failed: ${(error as Error).message}`);
+        res.status(500).json({ message: (error as Error).message });
+    }
 })
 
-router.post("/loginJwt", async (req: Request, res: Response, next: NextFunction) => {
+router.post("/loginJwt", async (req: Request, res: Response) => {
     try {
         const user = await getUserByUsername(dependencies)(req.body.userName);
-
-        if(!user){
-            throw new Error("Error logging in, unable to find username!!");
+        if (!user) {
+            return res.status(401).json({ message: "User not found" });
         }
 
-        const compareResult = await bcrypt.compare(req.body.userPassword, user.userPassword);
-
-        if(!compareResult){
-            throw new Error("Error logging in, invalid password!");
+        const passwordMatch = await bcrypt.compare(req.body.userPassword, user.userPassword);
+        if (!passwordMatch) {
+            return res.status(401).json({ message: "Invalid credentials" });
         }
 
-        const accessToken = generateAccessToken(user);
-        const refreshToken = generateRefreshToken(user);
-        refreshTokenDb.push(refreshToken);
-        res.json({
-            accessToken,
-            refreshToken
-        })
-
+        const token = generateAccessToken(user);
+        const refresh = generateRefreshToken(user);
+        refreshTokenDb.push(refresh);
+        
+        res.json({ accessToken: token, refreshToken: refresh })
     } catch (error) {
-        console.log(`Error logging in: ${(error as Error).message}`);
+        console.error(`Login error: ${(error as Error).message}`);
+        res.status(500).send({ error: (error as Error).message });
+    }
+})
         res.status(500).json({
             message: `Error logging in: ${(error as Error).message}`
         });
@@ -69,7 +67,6 @@ router.post("/checkUserAuthenticated", authenticateToken, async (req: any, res: 
         const user = req.user;
         console.log(user);
         res.json({
-            // Will also contain an IAT which is the time when the token was issued
             message: "user has access",
             user,
         })

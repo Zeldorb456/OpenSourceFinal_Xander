@@ -1,0 +1,306 @@
+﻿# Aggregated file: infrastructure.txt
+\n===== src/infrastructure/dependencies.ts =====
+import {config} from "../config/config"
+import mongoDbClient from './mongodb/mongoDbClient';
+
+const dependencies = { config,  mongoDbClient};
+
+export default dependencies;
+\n===== src/infrastructure/booking.ts =====
+import { CreateServiceUseCase, GetServicesUseCase } from '../use-cases/service';
+import { CreateBookingUseCase, GetBookingsUseCase, UpdateBookingStatusUseCase } from '../use-cases/booking';
+import { MongoServiceRepository } from './repositories/serviceRepository';
+import { MongoBookingRepository } from './repositories/bookingRepository';
+
+export const createService = (dependencies: any) => {
+  return async (serviceData: any) => {
+    const { mongoDbClient } = dependencies;
+    const serviceRepository = new MongoServiceRepository(mongoDbClient.Service);
+    const useCase = new CreateServiceUseCase(serviceRepository);
+    return await useCase.execute(serviceData);
+  };
+};
+
+export const getServices = (dependencies: any) => {
+  return async () => {
+    const { mongoDbClient } = dependencies;
+    const serviceRepository = new MongoServiceRepository(mongoDbClient.Service);
+    const useCase = new GetServicesUseCase(serviceRepository);
+    return await useCase.execute();
+  };
+};
+
+export const createBooking = (dependencies: any) => {
+  return async (bookingData: any) => {
+    const { mongoDbClient } = dependencies;
+    const bookingRepository = new MongoBookingRepository(mongoDbClient.Booking);
+    const serviceRepository = new MongoServiceRepository(mongoDbClient.Service);
+    const useCase = new CreateBookingUseCase(bookingRepository, serviceRepository);
+    return await useCase.execute(bookingData);
+  };
+};
+
+export const getBookings = (dependencies: any) => {
+  return async () => {
+    const { mongoDbClient } = dependencies;
+    const bookingRepository = new MongoBookingRepository(mongoDbClient.Booking);
+    const useCase = new GetBookingsUseCase(bookingRepository);
+    return await useCase.execute();
+  };
+};
+
+export const updateBookingStatus = (dependencies: any) => {
+  return async (bookingId: string, status: string) => {
+    const { mongoDbClient } = dependencies;
+    const bookingRepository = new MongoBookingRepository(mongoDbClient.Booking);
+    const useCase = new UpdateBookingStatusUseCase(bookingRepository);
+    return await useCase.execute(bookingId, status);
+  };
+};
+\n===== src/infrastructure/user.ts =====
+import { CreateUserUseCase, GetUserByUsernameUseCase } from '../use-cases/user';
+import { MongoUserRepository } from './repositories/userRepository';
+
+export const createUser = (dependencies: any) => {
+  return async (userData: any) => {
+    const { mongoDbClient } = dependencies;
+    const userRepository = new MongoUserRepository(mongoDbClient.User);
+    const useCase = new CreateUserUseCase(userRepository);
+    return await useCase.execute(userData);
+  };
+};
+
+export const getUserByUsername = (dependencies: any) => {
+  return async (userName: string) => {
+    const { mongoDbClient } = dependencies;
+    const userRepository = new MongoUserRepository(mongoDbClient.User);
+    const useCase = new GetUserByUsernameUseCase(userRepository);
+    return await useCase.execute(userName);
+  };
+};
+
+export const getUserById = (dependencies: any) => {
+  return async (userId: string) => {
+    const { mongoDbClient } = dependencies;
+    const userRepository = new MongoUserRepository(mongoDbClient.User);
+    const useCase = new GetUserByUsernameUseCase(userRepository);
+    return await useCase.execute(userId);
+  };
+};
+\n===== src/infrastructure/mongodb/connection.ts =====
+import { connect as connection } from 'mongoose';
+import {config} from "../../config/config"
+
+const mongoDb = config.mongo.url;
+
+export const ConnectToDb = async () => {
+  try {
+    await connection(mongoDb);
+    console.log('Connected to database successfully');
+  } catch (err) {
+    console.log('Disconnect');
+  }
+}
+
+\n===== src/infrastructure/mongodb/mongoDbClient.ts =====
+import { ConnectToDb } from "./connection";
+import { Service, Booking, User } from "./models"
+
+export default {
+  Service,
+  Booking,
+  User,
+  ConnectToDb
+};
+\n===== src\infrastructure\mongodb\queries\booking.ts =====
+import mongoose from 'mongoose';
+
+const createBooking = async (mongoDbBooking: any, bookingData: any) =>
+{
+  const result = await new mongoDbBooking({
+    _id: new mongoose.Types.ObjectId(),
+    ...bookingData,
+  }).save();
+  return result.toObject();
+}
+
+const getBookings = async (mongoDbBooking: any) =>
+{
+  const bookings = await mongoDbBooking.find({}).populate('serviceId').populate('userId');
+  return bookings;
+}
+
+const getBookingById = async (mongoDbBooking: any, bookingId: string) =>
+{
+  const booking = await mongoDbBooking.findById(bookingId).populate('serviceId').populate('userId');
+  return booking;
+}
+
+const updateBookingStatus = async (mongoDbBooking: any, bookingId: string, status: string) =>
+{
+  const booking = await mongoDbBooking.findByIdAndUpdate(bookingId, { status, updatedAt: new Date() }, { new: true });
+  return booking;
+}
+
+const getBookingsByUser = async (mongoDbBooking: any, userId: string) =>
+{
+  const bookings = await mongoDbBooking.find({ userId }).populate('serviceId');
+  return bookings;
+}
+
+export default  {
+  createBooking,
+  getBookings,
+  getBookingById,
+  updateBookingStatus,
+  getBookingsByUser,
+};
+\n===== src\infrastructure\mongodb\queries\service.ts =====
+import mongoose from 'mongoose';
+
+const createService = async (mongoDbService: any, serviceData: any) =>
+{
+  const result = await new mongoDbService({
+    _id: new mongoose.Types.ObjectId(),
+    ...serviceData,
+  }).save();
+  return result.toObject();
+}
+
+const getServices = async (mongoDbService: any) =>
+{
+  const services = await mongoDbService.find({});
+  return services;
+}
+
+const getServiceById = async (mongoDbService: any, serviceId: string) =>
+{
+  const service = await mongoDbService.findById(serviceId);
+  return service;
+}
+
+const updateServiceAvailability = async (mongoDbService: any, serviceId: string, date: Date, bookedSlots: number) =>
+{
+  const service = await mongoDbService.findById(serviceId);
+  if (!service || !service.availability) {
+    throw new Error('Service not found or not available');
+  }
+
+  const availabilityIndex = service.availability.findIndex((avail: any) => {
+    const availDate = new Date(avail.date);
+    return availDate.toDateString() === date.toDateString();
+  });
+
+  if (availabilityIndex !== -1) {
+    service.availability[availabilityIndex].bookedSlots += bookedSlots;
+    await service.save();
+  } else {
+    throw new Error('Availability date not found for service');
+  }
+  return service;
+}
+
+export default  {
+  createService,
+  getServices,
+  getServiceById,
+  updateServiceAvailability,
+}
+\n===== src\infrastructure\mongodb\queries\user.ts =====
+import mongoose from 'mongoose';
+
+const createUser = async (mongoDbUser: any, userData: any) =>
+{
+  const result = await new mongoDbUser({
+    _id: new mongoose.Types.ObjectId(),
+    ...userData,
+  }).save();
+  return result.toObject();
+}
+
+const getUserByUsername = async (mongoDbUser: any, userName: string) =>
+{
+  const user = await mongoDbUser.findOne({ userName });
+  return user;
+}
+
+const getUserById = async (mongoDbUser: any, userId: string) =>
+{
+  const user = await mongoDbUser.findById(userId);
+  return user;
+}
+
+export default  {
+  createUser,
+  getUserByUsername,
+  getUserById,
+};
+\n===== src\infrastructure\repositories\bookingRepository.ts =====
+import { IBookingRepository } from 'interfaces/repositories';
+import bookingQueries from '../mongodb/queries/booking';
+
+export class MongoBookingRepository implements IBookingRepository {
+  constructor(private mongoDbBooking: any) {}
+
+  async create(bookingData: any): Promise<any> {
+    return await bookingQueries.createBooking(this.mongoDbBooking, bookingData);
+  }
+
+  async findAll(): Promise<any[]> {
+    return await bookingQueries.getBookings(this.mongoDbBooking);
+  }
+
+  async findById(id: string): Promise<any> {
+    return await bookingQueries.getBookingById(this.mongoDbBooking, id);
+  }
+
+  async updateStatus(id: string, status: string): Promise<any> {
+    return await bookingQueries.updateBookingStatus(this.mongoDbBooking, id, status);
+  }
+
+  async findByUser(userId: string): Promise<any[]> {
+    return await bookingQueries.getBookingsByUser(this.mongoDbBooking, userId);
+  }
+}
+\n===== src\infrastructure\repositories\serviceRepository.ts =====
+import { IServiceRepository } from 'interfaces/repositories';
+import serviceQueries from '../mongodb/queries/service';
+
+export class MongoServiceRepository implements IServiceRepository {
+  constructor(private mongoDbService: any) {}
+
+  async create(serviceData: any): Promise<any> {
+    return await serviceQueries.createService(this.mongoDbService, serviceData);
+  }
+
+  async findAll(): Promise<any[]> {
+    return await serviceQueries.getServices(this.mongoDbService);
+  }
+
+  async findById(id: string): Promise<any> {
+    return await serviceQueries.getServiceById(this.mongoDbService, id);
+  }
+
+  async updateAvailability(id: string, date: Date, bookedSlots: number): Promise<any> {
+    return await serviceQueries.updateServiceAvailability(this.mongoDbService, id, date, bookedSlots);
+  }
+}
+\n===== src\infrastructure\repositories\userRepository.ts =====
+import { IUserRepository } from 'interfaces/repositories';
+import userQueries from '../mongodb/queries/user';
+
+export class MongoUserRepository implements IUserRepository {
+  constructor(private mongoDbUser: any) {}
+
+  async create(userData: any): Promise<any> {
+    return await userQueries.createUser(this.mongoDbUser, userData);
+  }
+
+  async findByUsername(userName: string): Promise<any> {
+    return await userQueries.getUserByUsername(this.mongoDbUser, userName);
+  }
+
+  async findById(id: string): Promise<any> {
+    return await userQueries.getUserById(this.mongoDbUser, id);
+  }
+}

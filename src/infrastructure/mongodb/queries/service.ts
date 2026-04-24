@@ -1,18 +1,16 @@
 import mongoose from 'mongoose';
 
-const createService = async (mongoDbService: any, serviceData: any) =>
-{
-  const result = await new mongoDbService({
+const createService = async (mongoDbService: any, svcData: any) => {
+  const svc = await new mongoDbService({
     _id: new mongoose.Types.ObjectId(),
-    ...serviceData,
+    ...svcData,
   }).save();
-  return result.toObject();
+  return svc.toObject();
 }
 
-const getServices = async (mongoDbService: any) =>
-{
-  const services = await mongoDbService.find({});
-  return services;
+const getServices = async (mongoDbService: any) => {
+  const results = await mongoDbService.find({});
+  return results.map((s: any) => s.toObject());
 }
 
 const getServiceById = async (mongoDbService: any, serviceId: string) =>

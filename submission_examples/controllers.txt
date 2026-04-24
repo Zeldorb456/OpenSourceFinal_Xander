@@ -1,12 +1,16 @@
+﻿# Aggregated file: controllers.txt
+\n===== src\controllers\booking.ts =====
 const checkAvailability = async (mongoDbService: any, serviceId: string, date: Date) => {
     const service = await mongoDbService.findById(serviceId);
-    if (!service) return false;
-    if (!service.availability) return false;
+    if (!service || !service.availability) return false;
 
-    const slot = service.availability.find((avail: any) => {
-        return new Date(avail.date).toDateString() === date.toDateString();
+    const availability = service.availability.find((avail: any) => {
+        const availDate = new Date(avail.date);
+        return availDate.toDateString() === date.toDateString();
     });
-    return slot && slot.availableSlots > slot.bookedSlots;
+
+    if (!availability) return false;
+    return availability.availableSlots > availability.bookedSlots;
 }
 
 const validateBookingData = (bookingData: any) => {

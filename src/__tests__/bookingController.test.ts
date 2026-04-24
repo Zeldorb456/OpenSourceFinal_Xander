@@ -94,7 +94,6 @@ describe('Booking Controller', () => {
         serviceId: 'service1',
         date: '2023-12-25',
         guestName: 'John Doe',
-        // missing email
       };
 
       expect(() => bookingController.validateBookingData(data)).toThrow('Guest name and email are required for guest bookings');

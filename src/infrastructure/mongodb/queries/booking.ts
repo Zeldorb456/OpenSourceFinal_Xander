@@ -1,18 +1,22 @@
 import mongoose from 'mongoose';
 
-const createBooking = async (mongoDbBooking: any, bookingData: any) =>
-{
-  const result = await new mongoDbBooking({
-    _id: new mongoose.Types.ObjectId(),
+const createBooking = async (mongoDbBooking: any, bookingData: any) => {
+  const id = new mongoose.Types.ObjectId();
+  const booking = new mongoDbBooking({
+    _id: id,
     ...bookingData,
-  }).save();
+  });
+  const result = await booking.save();
   return result.toObject();
 }
 
-const getBookings = async (mongoDbBooking: any) =>
-{
-  const bookings = await mongoDbBooking.find({}).populate('serviceId').populate('userId');
-  return bookings;
+const getBookings = async (mongoDbBooking: any) => {
+  try {
+    return await mongoDbBooking.find({}).populate('serviceId').populate('userId');
+  } catch (err) {
+    console.error('Failed to fetch bookings:', err);
+    throw err;
+  }
 }
 
 const getBookingById = async (mongoDbBooking: any, bookingId: string) =>

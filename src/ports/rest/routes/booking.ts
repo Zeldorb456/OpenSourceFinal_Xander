@@ -6,34 +6,28 @@ import bookingController from '../../../controllers/booking';
 
 const router = express.Router();
 
-// Get all services
-router.get("/services", async (req: Request, res: Response, next: NextFunction) => {
+router.get("/services", async (req: Request, res: Response) => {
   try {
-    const services = await getServices(dependencies)();
-    res.status(200).json(services);
+    const svc = await getServices(dependencies)();
+    res.json(svc);
   } catch (error) {
-    console.log(`Error retrieving services: ${(error as Error).message}`);
-    res.status(500).json({
-      message: `Error retrieving services: ${(error as Error).message}`
-    });
+    const msg = (error as Error).message;
+    console.error(`Cannot retrieve services: ${msg}`);
+    res.status(500).json({ message: msg });
   }
 });
 
-// Create a service (admin only)
-router.post("/services", authenticateAdmin, async (req: Request, res: Response, next: NextFunction) => {
+router.post("/services", authenticateAdmin, async (req: Request, res: Response) => {
   try {
-    const serviceData = req.body;
-    const result = await createService(dependencies)(serviceData);
-    res.status(201).json(result);
-  } catch (error) {
-    console.log(`Error creating service: ${(error as Error).message}`);
-    res.status(500).json({
-      message: `Error creating service: ${(error as Error).message}`
-    });
+    const payload = req.body;
+    const newService = await createService(dependencies)(payload);
+    res.status(201).json(newService);
+  } catch (e) {
+    console.log(`Failed to create service`);
+    res.status(500).send(e);
   }
 });
 
-// Create a booking
 router.post("/book", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bookingData = req.body;
@@ -48,7 +42,6 @@ router.post("/book", async (req: Request, res: Response, next: NextFunction) => 
   }
 });
 
-// Get all bookings (admin only)
 router.get("/bookings", authenticateAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bookings = await getBookings(dependencies)();
@@ -61,7 +54,6 @@ router.get("/bookings", authenticateAdmin, async (req: Request, res: Response, n
   }
 });
 
-// Update booking status (admin only)
 router.put("/bookings/:id/status", authenticateAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;

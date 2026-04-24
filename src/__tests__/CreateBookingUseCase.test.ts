@@ -1,13 +1,13 @@
 import { CreateBookingUseCase } from '../use-cases/booking';
 import { IBookingRepository, IServiceRepository } from '../interfaces/repositories';
 
-describe('CreateBookingUseCase', () => {
-  let bookingRepository: jest.Mocked<IBookingRepository>;
-  let serviceRepository: jest.Mocked<IServiceRepository>;
-  let useCase: CreateBookingUseCase;
+describe('Booking Creation Use Case', () => {
+  let bookingRepo: jest.Mocked<IBookingRepository>;
+  let serviceRepo: jest.Mocked<IServiceRepository>;
+  let createBookingCase: CreateBookingUseCase;
 
   beforeEach(() => {
-    bookingRepository = {
+    bookingRepo = {
       create: jest.fn(),
       findAll: jest.fn(),
       findById: jest.fn(),
@@ -15,25 +15,25 @@ describe('CreateBookingUseCase', () => {
       findByUser: jest.fn(),
     };
 
-    serviceRepository = {
+    serviceRepo = {
       create: jest.fn(),
       findAll: jest.fn(),
       findById: jest.fn(),
       updateAvailability: jest.fn(),
     };
 
-    useCase = new CreateBookingUseCase(bookingRepository, serviceRepository);
+    createBookingCase = new CreateBookingUseCase(bookingRepo, serviceRepo);
   });
 
-  it('should create a booking successfully', async () => {
-    const bookingData = {
-      serviceId: 'service1',
-      userId: 'user1',
+  it('creates booking when service available', async () => {
+    const input = {
+      serviceId: 'svc_001',
+      userId: 'usr_001',
       date: '2023-12-25',
     };
 
-    const mockService = {
-      _id: 'service1',
+    const mockSvc = {
+      _id: 'svc_001',
       availability: [{
         date: new Date('2023-12-25'),
         availableSlots: 5,

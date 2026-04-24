@@ -1,12 +1,12 @@
 import { CreateUserUseCase, GetUserByUsernameUseCase } from '../use-cases/user';
 import { MongoUserRepository } from './repositories/userRepository';
 
-export const createUser = (dependencies: any) => {
-  return async (userData: any) => {
-    const { mongoDbClient } = dependencies;
-    const userRepository = new MongoUserRepository(mongoDbClient.User);
-    const useCase = new CreateUserUseCase(userRepository);
-    return await useCase.execute(userData);
+export const createUser = (serviceContainer: any) => {
+  return async (userProfile: any) => {
+    const db = serviceContainer.mongoDbClient;
+    const repo = new MongoUserRepository(db.User);
+    const usecase = new CreateUserUseCase(repo);
+    return usecase.execute(userProfile);
   };
 };
 

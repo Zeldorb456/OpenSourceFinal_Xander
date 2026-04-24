@@ -1,0 +1,799 @@
+﻿# Aggregated file: tests.txt
+\n===== src\__tests__\authFunctions.test.ts =====
+import { generateAccessToken, generateRefreshToken, authenticateToken } from '../ports/rest/middleware/authentication';
+
+describe('Authentication Functions', () => {
+  it('should generate access token', () => {
+    const token = generateAccessToken({ userName: 'test', role: 'user' });
+    expect(token).toBeDefined();
+    expect(typeof token).toBe('string');
+  });
+
+  it('should generate refresh token', () => {
+    const token = generateRefreshToken({ userName: 'test', role: 'user' });
+    expect(token).toBeDefined();
+    expect(typeof token).toBe('string');
+  });
+
+  it('should authenticate token and set user', () => {
+    const token = generateAccessToken({ userName: 'test', role: 'user' });
+    const req = { headers: { authorization: `Bearer ${token}` } };
+    const res = {};
+    const next = jest.fn();
+
+    authenticateToken(req as any, res as any, next);
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('should reject request without token', () => {
+    const req = { headers: {} };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    const next = jest.fn();
+
+    authenticateToken(req as any, res as any, next);
+    expect(res.status).toHaveBeenCalledWith(401);
+  });
+
+  it('should reject invalid token', () => {
+    const req = { headers: { authorization: 'Bearer invalid' } };
+    const res = { sendStatus: jest.fn() };
+    const next = jest.fn();
+
+    authenticateToken(req as any, res as any, next);
+    expect(res.sendStatus).toHaveBeenCalledWith(403);
+  });
+});
+\n===== src\__tests__\authMiddleware.test.ts =====
+import { generateAccessToken, generateRefreshToken } from '../ports/rest/middleware/authentication';
+
+describe('Authentication Middleware', () => {
+  it('should generate access token', () => {
+    const user = { userName: 'test', role: 'user' };
+    const token = generateAccessToken(user);
+    expect(typeof token).toBe('string');
+    expect(token.length).toBeGreaterThan(0);
+  });
+
+  it('should generate refresh token', () => {
+    const user = { userName: 'test', role: 'user' };
+    const token = generateRefreshToken(user);
+    expect(typeof token).toBe('string');
+    expect(token.length).toBeGreaterThan(0);
+  });
+});
+\n===== src\__tests__\bookingController.test.ts =====
+import bookingController from '../controllers/booking';
+
+describe('Booking Controller', () => {
+  describe('checkAvailability', () => {
+    it('should return true if slots available', async () => {
+      const mockService = {
+        availability: [{
+          date: new Date('2023-12-25'),
+          availableSlots: 5,
+          bookedSlots: 2,
+        }],
+      };
+
+      const mongoDbService = {
+        findById: jest.fn().mockResolvedValue(mockService),
+      };
+
+      const result = await bookingController.checkAvailability(mongoDbService, 'service1', new Date('2023-12-25'));
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false if no slots available', async () => {
+      const mockService = {
+        availability: [{
+          date: new Date('2023-12-25'),
+          availableSlots: 5,
+          bookedSlots: 5,
+        }],
+      };
+
+      const mongoDbService = {
+        findById: jest.fn().mockResolvedValue(mockService),
+      };
+
+      const result = await bookingController.checkAvailability(mongoDbService, 'service1', new Date('2023-12-25'));
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false if service not found', async () => {
+      const mongoDbService = {
+        findById: jest.fn().mockResolvedValue(null),
+      };
+
+      const result = await bookingController.checkAvailability(mongoDbService, 'service1', new Date('2023-12-25'));
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('validateBookingData', () => {
+    it('should not throw for valid data with user', () => {
+      const data = {
+        serviceId: 'service1',
+        date: '2023-12-25',
+        userId: 'user1',
+      };
+
+      expect(() => bookingController.validateBookingData(data)).not.toThrow();
+    });
+
+    it('should not throw for valid data with guest', () => {
+      const data = {
+        serviceId: 'service1',
+        date: '2023-12-25',
+        guestName: 'John Doe',
+        guestEmail: 'john@example.com',
+      };
+
+      expect(() => bookingController.validateBookingData(data)).not.toThrow();
+    });
+
+    it('should throw if serviceId missing', () => {
+      const data = {
+        date: '2023-12-25',
+        userId: 'user1',
+      };
+
+      expect(() => bookingController.validateBookingData(data)).toThrow('Service ID and date are required');
+    });
+
+    it('should throw if date missing', () => {
+      const data = {
+        serviceId: 'service1',
+        userId: 'user1',
+      };
+
+      expect(() => bookingController.validateBookingData(data)).toThrow('Service ID and date are required');
+    });
+
+    it('should throw if guest data incomplete', () => {
+      const data = {
+        serviceId: 'service1',
+        date: '2023-12-25',
+        guestName: 'John Doe',
+      };
+
+      expect(() => bookingController.validateBookingData(data)).toThrow('Guest name and email are required for guest bookings');
+    });
+  });
+});
+\n===== src\__tests__\bookingQueries.test.ts =====
+import bookingQueries from '../infrastructure/mongodb/queries/booking';
+
+describe('Booking Queries', () => {
+  it('should create booking', async () => {
+    const mockSaved = { _id: '1', serviceId: 'service1', userId: 'user1', date: new Date(), toObject: () => ({ _id: '1', serviceId: 'service1', userId: 'user1', date: new Date() }) };
+    const mockModel = jest.fn().mockImplementation((data) => ({
+      ...data,
+      save: jest.fn().mockResolvedValue(mockSaved),
+    }));
+
+    const result = await bookingQueries.createBooking(mockModel, {
+      serviceId: 'service1',
+      userId: 'user1',
+      date: new Date()
+    });
+    expect(result._id).toBe('1');
+  });
+
+  it('should get bookings', async () => {
+    const mockModel = {
+      find: jest.fn().mockReturnValue({
+        populate: jest.fn().mockReturnValue({
+          populate: jest.fn().mockResolvedValue([{ _id: '1' }]),
+        }),
+      }),
+    };
+
+    const result = await bookingQueries.getBookings(mockModel);
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should get booking by id', async () => {
+    const mockModel = {
+      findById: jest.fn().mockReturnValue({
+        populate: jest.fn().mockReturnValue({
+          populate: jest.fn().mockResolvedValue({ _id: '1' }),
+        }),
+      }),
+    };
+
+    const result = await bookingQueries.getBookingById(mockModel, '1');
+    expect(result._id).toBe('1');
+  });
+
+  it('should update booking status', async () => {
+    const mockModel = {
+      findByIdAndUpdate: jest.fn().mockResolvedValue({ _id: '1', status: 'confirmed' }),
+    };
+
+    const result = await bookingQueries.updateBookingStatus(mockModel, '1', 'confirmed');
+    expect(result.status).toBe('confirmed');
+  });
+
+  it('should get bookings by user', async () => {
+    const mockModel = {
+      find: jest.fn().mockReturnValue({
+        populate: jest.fn().mockResolvedValue([{ _id: '1', userId: 'user1' }]),
+      }),
+    };
+
+    const result = await bookingQueries.getBookingsByUser(mockModel, 'user1');
+    expect(Array.isArray(result)).toBe(true);
+  });
+});
+\n===== src\__tests__\configDeps.test.ts =====
+import { config } from '../config/config';
+import dependencies from '../infrastructure/dependencies';
+
+describe('Config and Dependencies', () => {
+  it('should export config object', () => {
+    expect(config).toBeDefined();
+    expect(config.environment).toBeDefined();
+    expect(config.mongo).toBeDefined();
+  });
+
+  it('should export dependencies', () => {
+    expect(dependencies).toBeDefined();
+    expect(dependencies.mongoDbClient).toBeDefined();
+  });
+});
+\n===== src\__tests__\CreateBookingUseCase.test.ts =====
+import { CreateBookingUseCase } from '../use-cases/booking';
+import { IBookingRepository, IServiceRepository } from '../interfaces/repositories';
+
+describe('CreateBookingUseCase', () => {
+  let bookingRepository: jest.Mocked<IBookingRepository>;
+  let serviceRepository: jest.Mocked<IServiceRepository>;
+  let useCase: CreateBookingUseCase;
+
+  beforeEach(() => {
+    bookingRepository = {
+      create: jest.fn(),
+      findAll: jest.fn(),
+      findById: jest.fn(),
+      updateStatus: jest.fn(),
+      findByUser: jest.fn(),
+    };
+
+    serviceRepository = {
+      create: jest.fn(),
+      findAll: jest.fn(),
+      findById: jest.fn(),
+      updateAvailability: jest.fn(),
+    };
+
+    useCase = new CreateBookingUseCase(bookingRepository, serviceRepository);
+  });
+
+  it('should create a booking successfully', async () => {
+    const bookingData = {
+      serviceId: 'service1',
+      userId: 'user1',
+      date: '2023-12-25',
+    };
+
+    const mockService = {
+      _id: 'service1',
+      availability: [{
+        date: new Date('2023-12-25'),
+        availableSlots: 5,
+        bookedSlots: 2,
+      }],
+    };
+
+    const mockBooking = { _id: 'booking1', ...bookingData };
+
+    serviceRepository.findById.mockResolvedValue(mockService);
+    bookingRepository.create.mockResolvedValue(mockBooking);
+    serviceRepository.updateAvailability.mockResolvedValue(mockService);
+
+    const result = await useCase.execute(bookingData);
+
+    expect(result).toEqual(mockBooking);
+    expect(bookingRepository.create).toHaveBeenCalledWith({
+      ...bookingData,
+      date: new Date('2023-12-25'),
+    });
+    expect(serviceRepository.updateAvailability).toHaveBeenCalledWith('service1', new Date('2023-12-25'), 1);
+  });
+
+  it('should throw error for invalid date', async () => {
+    const bookingData = {
+      serviceId: 'service1',
+      date: 'invalid-date',
+    };
+
+    await expect(useCase.execute(bookingData)).rejects.toThrow('Invalid booking date');
+  });
+
+  it('should throw error if service not available', async () => {
+    const bookingData = {
+      serviceId: 'service1',
+      date: '2023-12-25',
+    };
+
+    const mockService = {
+      _id: 'service1',
+      availability: [{
+        date: new Date('2023-12-25'),
+        availableSlots: 5,
+        bookedSlots: 5,
+      }],
+    };
+
+    serviceRepository.findById.mockResolvedValue(mockService);
+
+    await expect(useCase.execute(bookingData)).rejects.toThrow('Service not available for the selected date');
+  });
+});
+\n===== src\__tests__\CreateServiceUseCase.test.ts =====
+import { CreateServiceUseCase } from '../use-cases/service';
+import { IServiceRepository } from '../interfaces/repositories';
+
+describe('CreateServiceUseCase', () => {
+  let serviceRepository: jest.Mocked<IServiceRepository>;
+  let useCase: CreateServiceUseCase;
+
+  beforeEach(() => {
+    serviceRepository = {
+      create: jest.fn(),
+      findAll: jest.fn(),
+      findById: jest.fn(),
+      updateAvailability: jest.fn(),
+    };
+
+    useCase = new CreateServiceUseCase(serviceRepository);
+  });
+
+  it('should create a service', async () => {
+    const serviceData = {
+      name: 'Hotel Booking',
+      type: 'hotel',
+      price: 100,
+    };
+
+    const mockService = { _id: 'service1', ...serviceData };
+
+    serviceRepository.create.mockResolvedValue(mockService);
+
+    const result = await useCase.execute(serviceData);
+
+    expect(result).toEqual(mockService);
+    expect(serviceRepository.create).toHaveBeenCalledWith(serviceData);
+  });
+});
+\n===== src\__tests__\CreateUserUseCase.test.ts =====
+import { CreateUserUseCase } from '../use-cases/user';
+import { IUserRepository } from '../interfaces/repositories';
+
+describe('CreateUserUseCase', () => {
+  let userRepository: jest.Mocked<IUserRepository>;
+  let useCase: CreateUserUseCase;
+
+  beforeEach(() => {
+    userRepository = {
+      create: jest.fn(),
+      findByUsername: jest.fn(),
+      findById: jest.fn(),
+    };
+
+    useCase = new CreateUserUseCase(userRepository);
+  });
+
+  it('should create a user', async () => {
+    const userData = {
+      userName: 'testuser',
+      userPassword: 'hashedpass',
+      email: 'test@example.com',
+    };
+
+    const mockUser = { _id: 'user1', ...userData };
+
+    userRepository.create.mockResolvedValue(mockUser);
+
+    const result = await useCase.execute(userData);
+
+    expect(result).toEqual(mockUser);
+    expect(userRepository.create).toHaveBeenCalledWith(userData);
+  });
+});
+\n===== src\__tests__\dependencies.test.ts =====
+import dependencies from '../infrastructure/dependencies';
+
+describe('Dependencies', () => {
+  it('should export mongoDbClient', () => {
+    expect(dependencies).toBeDefined();
+    expect(dependencies.mongoDbClient).toBeDefined();
+  });
+});
+\n===== src\__tests__\GetBookingsUseCase.test.ts =====
+import { GetBookingsUseCase } from '../use-cases/booking';
+import { IBookingRepository } from '../interfaces/repositories';
+
+describe('GetBookingsUseCase', () => {
+  let bookingRepository: jest.Mocked<IBookingRepository>;
+  let useCase: GetBookingsUseCase;
+
+  beforeEach(() => {
+    bookingRepository = {
+      create: jest.fn(),
+      findAll: jest.fn(),
+      findById: jest.fn(),
+      updateStatus: jest.fn(),
+      findByUser: jest.fn(),
+    };
+
+    useCase = new GetBookingsUseCase(bookingRepository);
+  });
+
+  it('should return all bookings', async () => {
+    const mockBookings = [
+      { _id: '1', serviceId: 'service1' },
+      { _id: '2', serviceId: 'service2' },
+    ];
+
+    bookingRepository.findAll.mockResolvedValue(mockBookings);
+
+    const result = await useCase.execute();
+
+    expect(result).toEqual(mockBookings);
+    expect(bookingRepository.findAll).toHaveBeenCalled();
+  });
+});
+\n===== src\__tests__\GetServicesUseCase.test.ts =====
+import { GetServicesUseCase } from '../use-cases/service';
+import { IServiceRepository } from '../interfaces/repositories';
+
+describe('GetServicesUseCase', () => {
+  let serviceRepository: jest.Mocked<IServiceRepository>;
+  let useCase: GetServicesUseCase;
+
+  beforeEach(() => {
+    serviceRepository = {
+      create: jest.fn(),
+      findAll: jest.fn(),
+      findById: jest.fn(),
+      updateAvailability: jest.fn(),
+    };
+
+    useCase = new GetServicesUseCase(serviceRepository);
+  });
+
+  it('should return all services', async () => {
+    const mockServices = [
+      { _id: '1', name: 'Hotel' },
+      { _id: '2', name: 'Car Rental' },
+    ];
+
+    serviceRepository.findAll.mockResolvedValue(mockServices);
+
+    const result = await useCase.execute();
+
+    expect(result).toEqual(mockServices);
+    expect(serviceRepository.findAll).toHaveBeenCalled();
+  });
+});
+\n===== src\__tests__\GetUserByUsernameUseCase.test.ts =====
+import { GetUserByUsernameUseCase } from '../use-cases/user';
+import { IUserRepository } from '../interfaces/repositories';
+
+describe('GetUserByUsernameUseCase', () => {
+  let userRepository: jest.Mocked<IUserRepository>;
+  let useCase: GetUserByUsernameUseCase;
+
+  beforeEach(() => {
+    userRepository = {
+      create: jest.fn(),
+      findByUsername: jest.fn(),
+      findById: jest.fn(),
+    };
+
+    useCase = new GetUserByUsernameUseCase(userRepository);
+  });
+
+  it('should return user by username', async () => {
+    const userName = 'testuser';
+    const mockUser = { _id: 'user1', userName };
+
+    userRepository.findByUsername.mockResolvedValue(mockUser);
+
+    const result = await useCase.execute(userName);
+
+    expect(result).toEqual(mockUser);
+    expect(userRepository.findByUsername).toHaveBeenCalledWith(userName);
+  });
+});
+\n===== src\__tests__\infraExports.test.ts =====
+describe('Infrastructure Layer', () => {
+  it('should export booking infrastructure', () => {
+    const booking = require('../infrastructure/booking');
+    expect(booking.createService).toBeDefined();
+    expect(booking.getServices).toBeDefined();
+    expect(booking.createBooking).toBeDefined();
+    expect(booking.getBookings).toBeDefined();
+    expect(booking.updateBookingStatus).toBeDefined();
+  });
+
+  it('should export user infrastructure', () => {
+    const user = require('../infrastructure/user');
+    expect(user.createUser).toBeDefined();
+    expect(user.getUserByUsername).toBeDefined();
+    expect(user.getUserById).toBeDefined();
+  });
+
+  it('should export dependencies', () => {
+    const deps = require('../infrastructure/dependencies');
+    expect(deps.default).toBeDefined();
+    expect(deps.default.mongoDbClient).toBeDefined();
+  });
+});
+\n===== src\__tests__\mongoModels.test.ts =====
+import mongoDbClient from '../infrastructure/mongodb/mongoDbClient';
+import { Service, Booking, User } from '../infrastructure/mongodb/models';
+
+describe('MongoDB Models', () => {
+  it('should export Service model', () => {
+    expect(mongoDbClient).toBeDefined();
+    expect(mongoDbClient.Service).toBeDefined();
+  });
+
+  it('should export Booking model', () => {
+    expect(mongoDbClient.Booking).toBeDefined();
+  });
+
+  it('should export User model', () => {
+    expect(mongoDbClient.User).toBeDefined();
+  });
+
+  it('should be a valid model instance', () => {
+    expect(typeof mongoDbClient.Service).not.toBe('undefined');
+    expect(typeof mongoDbClient.Booking).not.toBe('undefined');
+    expect(typeof mongoDbClient.User).not.toBe('undefined');
+  });
+});
+\n===== src\__tests__\repoClasses.test.ts =====
+import { MongoServiceRepository } from '../infrastructure/repositories/serviceRepository';
+import { MongoUserRepository } from '../infrastructure/repositories/userRepository';
+import { MongoBookingRepository } from '../infrastructure/repositories/bookingRepository';
+
+describe('Repository Classes', () => {
+  const mockModel = { find: jest.fn(), findById: jest.fn(), findOne: jest.fn() };
+
+  it('should instantiate service repository', () => {
+    const repo = new MongoServiceRepository(mockModel);
+    expect(repo).toBeDefined();
+  });
+
+  it('should instantiate user repository', () => {
+    const repo = new MongoUserRepository(mockModel);
+    expect(repo).toBeDefined();
+  });
+
+  it('should instantiate booking repository', () => {
+    const repo = new MongoBookingRepository(mockModel);
+    expect(repo).toBeDefined();
+  });
+});
+\n===== src\__tests__\routesBasic.test.ts =====
+import { Router } from 'express';
+
+describe('Booking Routes', () => {
+  it('should define routes', () => {
+    const router = Router();
+    expect(router).toBeDefined();
+    expect(typeof router.get).toBe('function');
+    expect(typeof router.post).toBe('function');
+  });
+
+  it('should handle GET /services', async () => {
+    const getServices = jest.fn().mockResolvedValue([]);
+    const req = {};
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    const next = jest.fn();
+
+    await getServices();
+    expect(getServices).toHaveBeenCalled();
+  });
+
+  it('should handle POST /book', async () => {
+    const createBooking = jest.fn().mockResolvedValue({ _id: '1' });
+    const req = { body: { serviceId: 's1' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    const next = jest.fn();
+
+    await createBooking();
+    expect(createBooking).toHaveBeenCalled();
+  });
+});
+\n===== src\__tests__\routesCoverage.test.ts =====
+import { NextFunction, Response, Request } from 'express';
+
+describe('Routes Coverage', () => {
+  const mockReq = {
+    body: {},
+    headers: {},
+    user: {},
+    params: {},
+  } as any;
+
+  const mockRes = {
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn(),
+    sendStatus: jest.fn(),
+  } as any;
+
+  const mockNext = jest.fn() as NextFunction;
+
+  it('should handle service creation', () => {
+    expect(mockRes.status).toBeDefined();
+    mockRes.status(201);
+    expect(mockRes.status).toHaveBeenCalledWith(201);
+  });
+
+  it('should handle booking creation', () => {
+    expect(mockRes.json).toBeDefined();
+    mockRes.json({ _id: '1' });
+    expect(mockRes.json).toHaveBeenCalled();
+  });
+
+  it('should handle service retrieval', () => {
+    const services = [{ _id: '1', name: 'Hotel' }];
+    mockRes.json(services);
+    expect(mockRes.json).toHaveBeenCalledWith(services);
+  });
+
+  it('should handle booking retrieval', () => {
+    const bookings = [{ _id: '1', serviceId: 's1' }];
+    mockRes.json(bookings);
+    expect(mockRes.json).toHaveBeenCalledWith(bookings);
+  });
+
+  it('should handle booking status update', () => {
+    const updated = { _id: '1', status: 'confirmed' };
+    mockRes.json(updated);
+    expect(mockRes.json).toHaveBeenCalledWith(updated);
+  });
+
+  it('should handle errors with 500 status', () => {
+    mockRes.status(500);
+    mockRes.json({ message: 'Error' });
+    expect(mockRes.status).toHaveBeenCalledWith(500);
+  });
+
+  it('should call next on middleware', () => {
+    mockNext();
+    expect(mockNext).toHaveBeenCalled();
+  });
+});
+\n===== src\__tests__\serviceQueries.test.ts =====
+import serviceQueries from '../infrastructure/mongodb/queries/service';
+
+describe('Service Queries', () => {
+  it('should create service', async () => {
+    const mockSaved = { _id: '1', name: 'Hotel', type: 'hotel', toObject: () => ({ _id: '1', name: 'Hotel', type: 'hotel' }) };
+    const mockModel = jest.fn().mockImplementation((data) => ({
+      ...data,
+      save: jest.fn().mockResolvedValue(mockSaved),
+    }));
+
+    const result = await serviceQueries.createService(mockModel, { name: 'Hotel', type: 'hotel' });
+    expect(result._id).toBe('1');
+    expect(result.name).toBe('Hotel');
+  });
+
+  it('should get services', async () => {
+    const mockModel = {
+      find: jest.fn().mockResolvedValue([{ _id: '1', name: 'Hotel' }]),
+    };
+
+    const result = await serviceQueries.getServices(mockModel);
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should get service by id', async () => {
+    const mockModel = {
+      findById: jest.fn().mockResolvedValue({ _id: '1', name: 'Hotel' }),
+    };
+
+    const result = await serviceQueries.getServiceById(mockModel, '1');
+    expect(result._id).toBe('1');
+  });
+
+  it('should update service availability', async () => {
+    const mockService = {
+      availability: [{ date: new Date('2023-12-25'), availableSlots: 5, bookedSlots: 2 }],
+      save: jest.fn().mockResolvedValue(true),
+    };
+
+    const mockModel = {
+      findById: jest.fn().mockResolvedValue(mockService),
+    };
+
+    const result = await serviceQueries.updateServiceAvailability(
+      mockModel,
+      'service1',
+      new Date('2023-12-25'),
+      1
+    );
+    expect(mockService.save).toHaveBeenCalled();
+  });
+});
+\n===== src\__tests__\UpdateBookingStatusUseCase.test.ts =====
+import { UpdateBookingStatusUseCase } from '../use-cases/booking';
+import { IBookingRepository } from '../interfaces/repositories';
+
+describe('UpdateBookingStatusUseCase', () => {
+  let bookingRepository: jest.Mocked<IBookingRepository>;
+  let useCase: UpdateBookingStatusUseCase;
+
+  beforeEach(() => {
+    bookingRepository = {
+      create: jest.fn(),
+      findAll: jest.fn(),
+      findById: jest.fn(),
+      updateStatus: jest.fn(),
+      findByUser: jest.fn(),
+    };
+
+    useCase = new UpdateBookingStatusUseCase(bookingRepository);
+  });
+
+  it('should update booking status', async () => {
+    const bookingId = 'booking1';
+    const status = 'confirmed';
+    const mockUpdatedBooking = { _id: bookingId, status };
+
+    bookingRepository.updateStatus.mockResolvedValue(mockUpdatedBooking);
+
+    const result = await useCase.execute(bookingId, status);
+
+    expect(result).toEqual(mockUpdatedBooking);
+    expect(bookingRepository.updateStatus).toHaveBeenCalledWith(bookingId, status);
+  });
+});
+\n===== src\__tests__\userQueries.test.ts =====
+import userQueries from '../infrastructure/mongodb/queries/user';
+
+describe('User Queries', () => {
+  it('should create user', async () => {
+    const mockSaved = { _id: '1', userName: 'testuser', userPassword: 'hash', email: 'test@example.com', toObject: () => ({ _id: '1', userName: 'testuser', userPassword: 'hash', email: 'test@example.com' }) };
+    const mockModel = jest.fn().mockImplementation((data) => ({
+      ...data,
+      save: jest.fn().mockResolvedValue(mockSaved),
+    }));
+
+    const result = await userQueries.createUser(mockModel, {
+      userName: 'testuser',
+      userPassword: 'hash',
+      email: 'test@example.com'
+    });
+    expect(result._id).toBe('1');
+    expect(result.userName).toBe('testuser');
+  });
+
+  it('should get user by username', async () => {
+    const mockModel = {
+      findOne: jest.fn().mockResolvedValue({ _id: '1', userName: 'testuser' }),
+    };
+
+    const result = await userQueries.getUserByUsername(mockModel, 'testuser');
+    expect(result.userName).toBe('testuser');
+  });
+
+  it('should get user by id', async () => {
+    const mockModel = {
+      findById: jest.fn().mockResolvedValue({ _id: '1', userName: 'testuser' }),
+    };
+
+    const result = await userQueries.getUserById(mockModel, '1');
+    expect(result._id).toBe('1');
+  });
+});
